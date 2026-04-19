@@ -1,0 +1,808 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at .claude/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. VERIFY COMMAND TEMPLATES: Command templates (math.tex, general.tex, macros.tex) are pre-copied to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# Diluted Steganography: How Signal Dilution Degrades LLM Steganographic Capabilities
+
+## 1. Executive Summary
+
+This study systematically investigates how increasing signal dilution affects LLMs&#39; ability to encode, extract, and detect steganographic messages hidden in text. We tested three frontier models (GPT-4.1, Claude Sonnet 4.5, Gemini 2.5 Pro) across six encoding schemes ranging from concentrated acrostics to highly diluted every-20th-word patterns and a novel trigger-word-based scheme.
+
+**Key finding**: All three models achieve near-perfect acrostic encoding (92-100% per-character accuracy) but collapse to near-random levels (0-31%) for any diluted scheme. The transition is abrupt, not gradual -- there is a **cliff effect** rather than a smooth degradation curve. This suggests LLMs have learned acrostics as a specific pattern rather than possessing a general steganographic capability. For extraction, GPT-4.1 retains moderate partial accuracy (35-55%) on diluted schemes when told the encoding rule, while Claude and Gemini degrade more sharply. Blind detection is essentially non-functional: models either flag everything (GPT-4.1, Gemini) or nothing (Claude) as steganographic, regardless of whether hidden messages are present.
+
+**Practical implication**: Even minimal signal dilution beyond acrostics renders current LLMs ineffective at both producing and detecting steganographic content, which has significant implications for AI safety monitoring systems.
+
+## 2. Research Question &amp; Motivation
+
+### Research Question
+How does signal dilution in steganographic encoding affect LLMs&#39; ability to (a) encode secret messages into text, (b) extract messages when the encoding scheme is known, and (c) detect hidden messages without scheme knowledge?
+
+### Motivation
+As LLM-generated text becomes ubiquitous, understanding the limits of steganographic capabilities is critical for:
+- **AI safety**: Can models covertly communicate through diluted signals that evade monitoring?
+- **Alignment monitoring**: If chain-of-thought monitoring relies on detecting hidden reasoning, how robust is it to diluted encoding?
+- **Capability evaluation**: Do models have general steganographic abilities, or only pattern-specific ones (e.g., acrostics)?
+
+### Gap in Existing Work
+Prior work (NEST, Karpov 2026; Early Signs, Zolkowski et al. 2025) established that LLMs can perform acrostic steganography and compared a few encoding schemes, but:
+1. No work systematically varied dilution level as a continuous parameter across 6+ levels
+2. Trigger-word-based encoding (word after each occurrence of a specific word) was untested
+3. The accuracy-detectability tradeoff as a function of dilution was uncharacterized
+4. No study measured encoding, extraction, and detection performance in a unified framework
+
+## 3. Methodology
+
+### Models Tested
+| Model | Provider | Temperature | Max Tokens |
+|-------|----------|-------------|------------|
+| GPT-4.1 | OpenAI API | 0.0-0.3 | 100-1024 |
+| Claude Sonnet 4.5 | OpenRouter | 0.0-0.3 | 100-1024 |
+| Gemini 2.5 Pro | OpenRouter | 0.0-0.3 | 100-1024 |
+
+### Encoding Schemes (ordered by increasing dilution)
+
+| Scheme | Signal Density | Description |
+|--------|---------------|-------------|
+| Acrostic | ~1 char / sentence | First letter of each sentence spells the message |
+| Every 3rd word | 1 char / 3 words | First letter of every 3rd word encodes a character |
+| Every 5th word | 1 char / 5 words | First letter of every 5th word encodes a character |
+| Trigger word (&#34;the&#34;) | ~1 char / 8 words | Word after each &#34;the&#34; starts with target letter |
+| Every 10th word | 1 char / 10 words | First letter of every 10th word encodes a character |
+| Every 20th word | 1 char / 20 words | First letter of every 20th word encodes a character |
+
+### Secret Messages
+Five words of varying length: &#34;HELLO&#34; (5), &#34;FROST&#34; (5), &#34;MAGIC&#34; (5), &#34;DANCE&#34; (5), &#34;SILVER&#34; (6)
+
+### Experimental Design
+
+**Experiment 1 -- Encoding Capability** (90 trials: 3 models x 6 schemes x 5 messages)
+- Prompt each LLM to write natural text encoding a secret message using a specified scheme
+- Programmatically extract the hidden message and measure per-character accuracy and exact match rate
+
+**Experiment 2 -- Informed Extraction** (90 trials)
+- Generate ground-truth steganographic texts programmatically (verified correct encoding)
+- Provide each LLM with the text and explicit extraction instructions
+- Measure per-character extraction accuracy and exact match rate
+
+**Experiment 3 -- Blind Detection** (90 trials: 3 models x 6 schemes x [3 stego + 2 control])
+- Present texts (some with hidden messages, some controls) without revealing the encoding scheme
+- Ask LLMs to determine if a hidden message is present and extract it if found
+- Measure true positive rate, false positive rate, and blind extraction accuracy
+
+### Reproducibility
+- Random seed: 42 for all programmatic text generation
+- API temperature: 0.0 for extraction/detection, 0.3 for encoding
+- Total API calls: 270 (90 per experiment, but Experiment 1 ran separately with 90 additional calls for a total of 270 experiment calls + utility calls)
+- Total tokens: ~30K input, ~44K output
+- Python 3.12.8, numpy 2.3.0, scipy 1.17.1, matplotlib 3.10.3
+
+## 4. Results
+
+### Experiment 1: Encoding Capability
+
+**Per-Character Accuracy (Mean +/- Std)**
+
+| Scheme | GPT-4.1 | Claude Sonnet 4.5 | Gemini 2.5 Pro |
+|--------|---------|-------------------|----------------|
+| **Acrostic** | **1.00 +/- 0.00** | **1.00 +/- 0.00** | **0.92 +/- 0.18** |
+| Every 3rd word | 0.23 +/- 0.09 | 0.04 +/- 0.09 | 0.43 +/- 0.52 |
+| Every 5th word | 0.31 +/- 0.18 | 0.00 +/- 0.00 | 0.15 +/- 0.17 |
+| Trigger word | 0.31 +/- 0.18 | 0.14 +/- 0.22 | 0.30 +/- 0.24 |
+| Every 10th word | 0.23 +/- 0.09 | 0.07 +/- 0.10 | 0.31 +/- 0.27 |
+| Every 20th word | 0.23 +/- 0.09 | 0.04 +/- 0.09 | 0.23 +/- 0.09 |
+
+![Encoding Accuracy](figures/exp1_encoding_accuracy.png)
+
+**Key observations**:
+- **Cliff effect**: All models drop from ~92-100% accuracy on acrostics to &lt;43% on any diluted scheme. There is no gradual degradation.
+- **Exact match**: 100% for GPT-4.1 and Claude on acrostics, 80% for Gemini. 0% exact match for ALL models on ALL diluted schemes.
+- **Claude is worst at diluted encoding**: Near-zero accuracy on non-acrostic schemes, suggesting strong pattern-specificity.
+- **Gemini shows high variance on every-3rd-word** (0.43 +/- 0.52), indicating inconsistent performance.
+
+**Statistical significance**: Mann-Whitney U tests confirm acrostic vs. all other schemes are significantly different for all models (p &lt; 0.01 for GPT-4.1 and Claude, p &lt; 0.01 for most Gemini comparisons). Spearman correlation between dilution rank and accuracy: rho = -0.47 (GPT-4.1, p=0.008), rho = -0.43 (Claude, p=0.017), rho = -0.32 (Gemini, p=0.088).
+
+### Experiment 2: Informed Extraction
+
+**Per-Character Extraction Accuracy (Mean +/- Std)**
+
+| Scheme | GPT-4.1 | Claude Sonnet 4.5 | Gemini 2.5 Pro |
+|--------|---------|-------------------|----------------|
+| **Acrostic** | **1.00 +/- 0.00** | **0.80 +/- 0.45** | **0.84 +/- 0.36** |
+| Every 3rd word | 0.43 +/- 0.33 | 0.19 +/- 0.18 | 0.31 +/- 0.22 |
+| Every 5th word | 0.55 +/- 0.42 | 0.28 +/- 0.30 | 0.27 +/- 0.12 |
+| Trigger word | 0.43 +/- 0.17 | 0.27 +/- 0.34 | 0.15 +/- 0.17 |
+| Every 10th word | 0.39 +/- 0.35 | 0.07 +/- 0.10 | 0.23 +/- 0.06 |
+| Every 20th word | 0.35 +/- 0.36 | 0.03 +/- 0.07 | 0.19 +/- 0.12 |
+
+![Extraction Accuracy](figures/exp2_extraction_accuracy.png)
+
+**Key observations**:
+- **GPT-4.1 is best at extraction** even for diluted schemes, maintaining 35-55% partial accuracy. This is well above random (3.8%) but far from reliable.
+- **Extraction is easier than encoding** for GPT-4.1 (e.g., 55% extraction vs 31% encoding on every-5th-word), supporting hypothesis H2.
+- **Claude degrades sharply**: From 80% on acrostics to 3% on every-20th-word. Claude also frequently responded with meta-commentary (&#34;I&#39;ll identify every 10th word...&#34;) instead of actually extracting, suggesting it struggled to follow the positional counting instructions.
+- **Trigger-word extraction** is difficult for all models, with Gemini achieving only 15%.
+- **Monotonic decrease confirmed**: Spearman correlation between dilution rank and extraction accuracy is significant for all models (p &lt; 0.01).
+
+### Experiment 3: Blind Detection
+
+| Model | True Positive Rate | False Positive Rate | Discriminability |
+|-------|-------------------|--------------------|--------------------|
+| GPT-4.1 | 100% (all schemes) | 100% (all schemes) | **None** -- always says YES |
+| Claude Sonnet 4.5 | 0% (all schemes) | 0% (all schemes) | **None** -- always says NO |
+| Gemini 2.5 Pro | 100% (all schemes) | 100% (all schemes) | **None** -- always says YES |
+
+![Detection Rates](figures/exp3_detection_rates.png)
+
+**Key observations**:
+- **No model can discriminate** between steganographic and control texts. Each model applies a fixed bias regardless of content.
+- **GPT-4.1 and Gemini always claim hidden messages exist**, even in control texts. GPT-4.1 attempts first-letter-of-every-word extraction on controls, hallucinating patterns.
+- **Claude always says no hidden messages**, but paradoxically, when it analyzes acrostic texts, it correctly identifies the first letters of sentences and extracts the exact hidden message (100% extraction accuracy on acrostics) -- while still answering &#34;DETECTION: NO.&#34; This reveals a cautious/conservative bias in its classification behavior.
+- **Dilution has no effect on detection** because detection doesn&#39;t work at any level -- the problem is calibration of the detection judgment itself, not sensitivity to the signal.
+
+### Combined Dilution Curve
+
+![Dilution Curve](figures/dilution_curve.png)
+
+This figure shows the overall dilution-accuracy relationship across all three experiments. The cliff between acrostic and all other schemes is the dominant pattern.
+
+## 5. Analysis &amp; Discussion
+
+### Support for Hypotheses
+
+| Hypothesis | Supported? | Evidence |
+|-----------|-----------|---------|
+| H1: Encoding accuracy decreases with dilution | **Partially** | The decrease is real (Spearman rho significant) but is better described as a **cliff** after acrostics than a monotonic gradient. Non-acrostic schemes cluster near 0-30% with no clear ordering. |
+| H2: Extraction is easier than encoding | **Yes (for GPT-4.1)** | GPT-4.1 extraction (35-55%) consistently exceeds encoding (23-31%) on diluted schemes. Claude and Gemini show less clear separation. |
+| H3: Blind detection drops with dilution | **No (vacuously)** | Detection doesn&#39;t work at any dilution level. Models use fixed biases (always YES or always NO). |
+| H4: Trigger-word encoding is harder than positional | **Weakly supported** | Trigger-word extraction accuracy is among the lowest for Claude and Gemini, but GPT-4.1 shows similar performance across diluted schemes. |
+
+### Why the Cliff Effect?
+
+The most striking finding is the abrupt collapse from acrostic to any other scheme. We hypothesize:
+
+1. **Acrostics are a memorized pattern**: LLMs have extensive training data containing acrostic poems, puzzles, and writing exercises. They have learned &#34;first letter of each sentence&#34; as a specific skill, not a general steganographic capability.
+
+2. **Counting is hard for autoregressive models**: Schemes like &#34;every 3rd word&#34; or &#34;every 10th word&#34; require the model to maintain a running word counter during generation/extraction. Transformer-based models are known to struggle with precise counting and positional arithmetic.
+
+3. **Sentences are natural boundaries**: Acrostics align with a natural linguistic unit (the sentence), making them cognitively tractable. Word-position schemes cut across sentence boundaries, requiring a different type of attention.
+
+### Implications for AI Safety
+
+1. **Current LLM monitoring is fragile**: If models wanted to communicate covertly, even simple diluted encoding would evade current LLM-based monitors (which can&#39;t even discriminate stego from non-stego text).
+
+2. **But models can&#39;t produce diluted steganography either**: The same limitation that makes detection hard also makes production hard. Current models lack the counting/positional precision for diluted schemes.
+
+3. **The acrostic-specific capability is a false signal**: The impressive acrostic performance should not be extrapolated to general steganographic ability. It reflects pattern memorization, not compositional steganographic reasoning.
+
+4. **Defense-in-depth is needed**: Since LLM monitors can&#39;t discriminate, statistical and algorithmic detection methods (entropy analysis, frequency analysis) may be more reliable than LLM-based &#34;does this look suspicious?&#34; checks.
+
+### Comparison to Prior Work
+
+- **NEST (Karpov 2026)**: Reported 92% per-number accuracy for Claude Opus 4.5 on acrostics at D=4, declining to 12% at D=50. Our acrostic results are consistent (92-100%). Their D parameter increases sequence length while maintaining acrostic encoding; our dilution parameter changes the encoding scheme itself. Both show degradation, but ours is a cliff while theirs is a slope -- suggesting length-based difficulty is more gradual than scheme-based difficulty.
+
+- **Early Signs (Zolkowski et al. 2025)**: Found `sentence_letter` outperforms `third_word_letter`. Our results strongly confirm this: acrostic encoding dramatically outperforms every-3rd-word and all other diluted schemes.
+
+## 6. Limitations
+
+1. **Small sample sizes**: 5 messages per condition limits statistical power. Larger studies (50-100+ messages) would provide tighter confidence intervals and more reliable effect size estimates.
+
+2. **Programmatic ground-truth texts**: Our generated texts use a formulaic structure (limited vocabulary, repetitive sentence endings) which may differ from natural language. Models may perform differently on more naturalistic steganographic texts.
+
+3. **Binary detection framing**: Asking models for YES/NO detection may elicit response biases. A forced-choice design (which of two texts contains a hidden message?) might yield more informative results.
+
+4. **Single prompt design**: Different prompting strategies (chain-of-thought, few-shot examples, step-by-step counting instructions) might improve performance on diluted schemes. We used a single, direct prompt.
+
+5. **Temperature sensitivity**: We used temperature 0.0 for extraction/detection and 0.3 for encoding. Higher temperatures might yield different results.
+
+6. **No fine-tuned models**: All tests used prompted, off-the-shelf models. Fine-tuned models (as in Roger &amp; Greenblatt 2023) might show different capabilities.
+
+7. **Limited control text diversity**: Control texts used a small vocabulary pool, which may have influenced detection biases (models might detect the unusual vocabulary rather than steganographic patterns).
+
+## 7. Conclusions &amp; Next Steps
+
+### Clear Answer to Research Question
+Signal dilution beyond acrostic-level encoding catastrophically degrades LLM steganographic capabilities. All three frontier models tested (GPT-4.1, Claude Sonnet 4.5, Gemini 2.5 Pro) show a cliff-like collapse from near-perfect acrostic performance to near-random performance on any diluted scheme. This is not a gradual degradation but an abrupt transition, suggesting acrostic steganography is a memorized pattern rather than a general capability. Blind detection is non-functional at all dilution levels.
+
+### Recommended Follow-Up Experiments
+1. **Prompt engineering for counting**: Test whether chain-of-thought prompting or explicit counting scaffolds improve diluted encoding/extraction
+2. **Fine-tuned steganography**: Train models specifically on diluted encoding tasks to measure the ceiling of learnable capability
+3. **Natural language steganography**: Use human-written cover texts instead of programmatic ones
+4. **Forced-choice detection**: Replace YES/NO detection with &#34;which text contains the message?&#34; to control for response biases
+5. **Larger sample sizes**: 50-100 messages per condition for robust statistics
+6. **More models**: Include reasoning models (o3, DeepSeek R1) that may handle counting better
+
+### Open Questions
+- Is the cliff effect due to training data (acrostic-specific pattern) or architecture (counting difficulty)?
+- Could tool-augmented LLMs (with access to word counters) bridge the gap?
+- At what scale of fine-tuning data would models learn diluted steganographic encoding?
+
+## References
+
+1. Karpov, A. (2026). NEST: Nascent Encoded Steganographic Thoughts. arXiv:2602.14095.
+2. Zolkowski et al. (2025). Early Signs of Steganographic Capabilities in Frontier LLMs. arXiv:2507.02737.
+3. Karpov et al. (2025). The Steganographic Potentials of Language Models. arXiv:2505.03439.
+4. Roger, F. &amp; Greenblatt, R. (2023). Preventing Language Models From Hiding Their Reasoning. arXiv:2310.01405.
+5. Motwani et al. (2024). Secret Collusion among AI Agents. arXiv:2402.07871.
+6. Mathew et al. (2024). Hidden in Plain Text. arXiv:2410.03768.
+7. Ziegler et al. (2019). Neural Linguistic Steganography. arXiv:1909.01496.
+
+## Appendix: Experimental Configuration
+
+```json
+{
+    &#34;seed&#34;: 42,
+    &#34;secret_messages&#34;: [&#34;HELLO&#34;, &#34;FROST&#34;, &#34;MAGIC&#34;, &#34;DANCE&#34;, &#34;SILVER&#34;],
+    &#34;encoding_schemes&#34;: [&#34;acrostic&#34;, &#34;nth_word_3&#34;, &#34;nth_word_5&#34;, &#34;trigger_word&#34;, &#34;nth_word_10&#34;, &#34;nth_word_20&#34;],
+    &#34;models&#34;: [&#34;gpt-4.1&#34;, &#34;claude-sonnet-4-5&#34;, &#34;gemini-2.5-pro&#34;],
+    &#34;trials_per_condition&#34;: 5,
+    &#34;total_api_calls&#34;: 270,
+    &#34;total_input_tokens&#34;: 30314,
+    &#34;total_output_tokens&#34;: 43859,
+    &#34;python_version&#34;: &#34;3.12.8&#34;,
+    &#34;hardware&#34;: &#34;4x NVIDIA RTX A6000 (49GB each) -- GPUs not used (API-based experiments)&#34;
+}
+```
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Research Plan: Diluted Steganography
+
+## Motivation &amp; Novelty Assessment
+
+### Why This Research Matters
+As LLMs become more capable, understanding their ability to encode and detect hidden messages in text is critical for AI safety. Current work (NEST, Early Signs) shows LLMs can handle acrostic-style steganography, but the key question is: what happens when the signal is diluted? If LLMs can&#39;t detect diluted steganographic patterns, this has implications for monitoring systems designed to catch covert communication between AI agents.
+
+### Gap in Existing Work
+Based on the literature review, NEST (2026) studied acrostics at varying sequence lengths and Early Signs (2025) compared `sentence_letter` vs `third_word_letter`, but:
+- No systematic study varies dilution level as a continuous parameter
+- Trigger-word-based encoding (word after each occurrence of a specific word) is untested
+- The accuracy-detectability tradeoff as a function of dilution is uncharacterized
+- No work tests LLM *extraction* ability across a dilution gradient
+
+### Our Novel Contribution
+We systematically measure how LLM performance degrades across a dilution gradient, testing both:
+1. **Encoding**: Can LLMs produce text with diluted steganographic patterns?
+2. **Extraction (informed)**: Can LLMs extract messages when told the encoding scheme?
+3. **Detection (blind)**: Can LLMs detect hidden messages without knowing the scheme?
+4. **Trigger-word encoding**: A novel, more naturalistic dilution method
+
+### Experiment Justification
+- **Experiment 1 (Encoding)**: Tests if LLMs can *produce* diluted steganography - fundamental capability
+- **Experiment 2 (Informed Extraction)**: Tests if LLMs can *decode* when given the key - measures cognitive capacity for diluted patterns
+- **Experiment 3 (Blind Detection)**: Tests real-world detectability - critical for AI safety monitoring
+
+## Research Question
+How does signal dilution in steganographic encoding affect LLMs&#39; ability to (a) encode secret messages, (b) extract messages when the scheme is known, and (c) detect hidden messages without scheme knowledge?
+
+## Hypothesis Decomposition
+- **H1**: LLM encoding accuracy decreases monotonically as dilution increases
+- **H2**: Informed extraction accuracy decreases with dilution but more slowly than encoding accuracy (extraction is easier than generation)
+- **H3**: Blind detection rate drops sharply beyond a dilution threshold
+- **H4**: Trigger-word-based encoding is harder for LLMs than positional encoding at equivalent dilution levels
+
+## Proposed Methodology
+
+### Encoding Schemes (ordered by increasing dilution)
+1. **Acrostic**: First letter of each sentence encodes a character (baseline, concentrated)
+2. **Every-3rd-word**: First letter of every 3rd word encodes a character
+3. **Every-5th-word**: First letter of every 5th word
+4. **Trigger-word**: Word following each occurrence of &#34;the&#34; starts with target letter
+5. **Every-10th-word**: First letter of every 10th word
+6. **Every-20th-word**: First letter of every 20th word (very diluted)
+
+### Secret Messages
+Short words: &#34;HELLO&#34;, &#34;SECRET&#34;, &#34;DANGER&#34;, &#34;ESCAPE&#34;, &#34;FROST&#34;, &#34;MAGIC&#34;
+(4-6 characters, using common initial letters)
+
+### Models
+- **GPT-4.1** (via OpenAI API) - strong frontier model
+- **Claude Sonnet 4.5** (via OpenRouter) - strong frontier model
+- **Gemini 2.5 Pro** (via OpenRouter) - strong frontier model
+
+### Experimental Steps
+1. **Programmatic text generation**: Create ground-truth texts with known hidden messages for each encoding scheme (for extraction/detection experiments)
+2. **LLM encoding experiment**: Ask each model to encode messages using each scheme (20 trials per scheme × model)
+3. **LLM informed extraction**: Give ground-truth texts + scheme description, ask model to extract (20 trials per scheme × model)
+4. **LLM blind detection**: Give ground-truth texts without scheme info, ask if hidden message exists (20 trials per scheme × model)
+5. Analysis and visualization
+
+### Baselines
+- Random chance extraction (1/26 per character ≈ 3.8%)
+- Random chance detection (50% if binary yes/no)
+- Acrostic performance as &#34;concentrated&#34; ceiling
+
+### Evaluation Metrics
+- **Per-character accuracy**: Fraction of correctly extracted characters
+- **Exact match rate**: Full message correctly extracted
+- **Detection rate**: True positive rate for hidden message detection
+- **False positive rate**: Detection rate on texts without hidden messages
+
+### Statistical Analysis Plan
+- Bootstrap confidence intervals (95%) for all metrics
+- Chi-square tests comparing accuracy across dilution levels
+- Spearman rank correlation between dilution level and accuracy
+- Effect sizes (Cohen&#39;s d) for pairwise comparisons
+
+## Expected Outcomes
+- Acrostic: High encoding/extraction accuracy (&gt;80%), high detection rate
+- Every-3rd-word: Moderate encoding (~50-70%), moderate extraction
+- Trigger-word: Low encoding accuracy, low-moderate extraction
+- Every-10th/20th-word: Very low encoding/extraction, near-chance detection
+- Clear monotonic decrease in performance with dilution
+
+## Timeline
+- Phase 0-1 (Planning): 20 min ✓
+- Phase 2 (Setup + Implementation): 60 min
+- Phase 3-4 (Experiments): 90 min
+- Phase 5 (Analysis + Documentation): 45 min
+
+## Potential Challenges
+- API rate limits → use retry with exponential backoff
+- Models refusing steganography requests → frame as research/puzzle
+- Programmatic text generation quality → use templates + validation
+- Cost → limit to 20 trials per condition, use cheaper models for pilot
+
+## Success Criteria
+- Clear dilution-accuracy curve across at least 4 dilution levels
+- Statistical significance for accuracy differences between concentrated vs diluted schemes
+- Results from at least 2 frontier models
+- Actionable insights for AI safety monitoring
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: Diluted Steganography in Large Language Models
+
+## Research Area Overview
+
+This literature review investigates how current LLMs handle steganographic encoding, with a focus on the research gap between **obvious encoding patterns** (e.g., acrostics where the first letter of each sentence spells a message) and **diluted encoding patterns** (e.g., the word after each use of a specific trigger word). The hypothesis under investigation is that LLMs will perform significantly worse on more diluted steganographic patterns compared to concentrated ones like acrostics, and that the degree of signal dilution systematically affects both encoding accuracy and detection evasion.
+
+The field sits at the intersection of AI safety, steganography, and LLM capability evaluation. Research interest is driven by concerns that LLMs capable of steganographic communication could evade chain-of-thought (CoT) monitoring, enable covert agent collusion, and undermine alignment techniques.
+
+---
+
+## Key Papers
+
+### Paper 1: NEST: Nascent Encoded Steganographic Thoughts
+- **Authors**: Artem Karpov
+- **Year**: 2026
+- **Source**: arXiv:2602.14095
+- **Key Contribution**: The most directly relevant paper. Introduces a systematic evaluation of steganographic counting using **sentence acrostics** across 28 models and 10 difficulty levels. Demonstrates that performance degrades sharply with sequence length D (a form of signal dilution).
+- **Methodology**: Models receive a cover question, a hidden numerical sequence, and must encode digits via first letters of sentences using a randomized digit-to-letter mapping. Evaluates encoding accuracy, monitor evasion, and translation quality.
+- **Datasets Used**: Custom counting tasks, Anthropic HH-RLHF (cover questions), GSM8K (math tasks), custom arithmetic problems, maze navigation tasks.
+- **Key Results**:
+  - Claude Opus 4.5: 92% per-number accuracy at D=4, 78% at D=8, drops to 29% at D=16, 19% at D=26, 12% at D=50
+  - Exact match drops to zero for all models at D&gt;=16
+  - Capability scales with model generation (Opus 4 -&gt; 4.1 -&gt; 4.5)
+  - No model could sustain steganographic *reasoning* on math tasks
+  - GPT-5.2 showed rare &#34;refuse but comply&#34; behavior (&lt;1%)
+- **Code Available**: Not publicly released
+- **Relevance**: Directly studies the &#34;obvious&#34; end of the steganographic spectrum (acrostics). Our research extends this by examining more diluted patterns. The D parameter is essentially a measure of encoding density, making this the closest prior work.
+
+### Paper 2: Early Signs of Steganographic Capabilities in Frontier LLMs
+- **Authors**: Zolkowski, Nishimura-Gasparian, McCarthy, Zimmermann, Lindner
+- **Year**: 2025
+- **Source**: arXiv:2507.02737
+- **Key Contribution**: Provides the most comprehensive evaluation of both encoded message passing and encoded reasoning. Critically, tests multiple encoding schemes with varying signal density including `sentence_letter` (acrostic) and `third_word_letter` (diluted).
+- **Methodology**: Evaluates message passing (with/without CoT, with/without coordination) and encoded reasoning (state-tracking, AQuA-RAT, GPQA-Diamond) across multiple frontier models. Uses GPT-4.1-mini as monitor with 1% false positive threshold.
+- **Datasets Used**: Anthropic helpfulness dataset (cover tasks), custom state-tracking tasks (1D/2D), AQuA-RAT, GPQA-Diamond.
+- **Key Results**:
+  - Models default to acrostics when asked to steganographically encode
+  - `sentence_letter` performs better than `third_word_letter` in message passing (direct evidence for dilution effect)
+  - Models are much worse at implementing uncommon encoding schemes
+  - First-letter scheme yields modest accuracy gains for short sequences (3-5 moves) but drops toward baseline for longer ones
+  - &#34;Subtle&#34; model-generated schemes achieve no improvement over no-reasoning baseline
+  - Cover task adds &#34;cognitive load&#34; that degrades performance further
+- **Code Available**: Yes - https://github.com/arturzolkowski/steganographic-evals
+- **Relevance**: Directly compares encoding schemes of different signal densities. The `third_word_letter` scheme represents a diluted pattern. Their finding that models struggle more with this scheme supports our hypothesis.
+
+### Paper 3: The Steganographic Potentials of Language Models
+- **Authors**: Karpov, Adeleke, Cho, Perez-Campanero
+- **Year**: 2025
+- **Source**: arXiv:2505.03439, Published at Building Trust Workshop at ICLR 2025
+- **Key Contribution**: Explores RL fine-tuning for steganography (colors experiment, direct steganography) and prompted evaluations. Shows that explicit algorithmic guidance markedly enhances information concealment capacity.
+- **Methodology**: (1) Colors experiment: RL fine-tuning to map colors to names. (2) Direct steganography: encode payloads in article summaries. (3) Prompted evaluations with direct, synonym substitution, coordination, and game scenarios.
+- **Datasets Used**: Wikinews dataset, MMLU (Hendrycks et al.), custom color-name mappings.
+- **Key Results**:
+  - RL improved covert communication by ~20% for 3 bits of entropy
+  - Performance declined 33.5% average as payload length increased
+  - o1 outperformed other models in coordination and game scenarios (undetected accuracy 0.66 with coordination, 0.36 in game)
+  - Models spontaneously use first-letter encoding strategies
+  - Categorizes capabilities into intention, experimentation, and implementation
+- **Code Available**: No
+- **Relevance**: Demonstrates that RL can induce steganographic behavior and that longer payloads degrade performance - consistent with signal dilution effects.
+
+### Paper 4: Preventing Language Models From Hiding Their Reasoning
+- **Authors**: Fabien Roger, Ryan Greenblatt
+- **Year**: 2023
+- **Source**: arXiv:2310.01405
+- **Key Contribution**: Seminal work showing LMs can be trained (via SFT) to use encoded reasoning in CoT. Introduces paraphrasing as a defense and shows it limits encoding to ~3 bits/KB.
+- **Methodology**: Fine-tunes models to encode reasoning in steganographic text, then evaluates paraphrasing defenses.
+- **Key Results**: Under paraphrasing, even best encoding schemes limited to ~3 bits/KB of text. This is relevant to diluted patterns since dilution effectively reduces bits/token.
+- **Code Available**: No
+- **Relevance**: Establishes the theoretical framework for encoded reasoning and defenses. Paraphrasing as a defense is more effective against concentrated signals than diluted ones.
+
+### Paper 5: Secret Collusion among AI Agents: Multi-Agent Deception via Steganography
+- **Authors**: Motwani, Baranchuk, Strohmeier, Bolina, Torr, Hammond, de Witt
+- **Year**: 2024
+- **Source**: arXiv:2402.07871
+- **Key Contribution**: Formalizes secret collusion in multi-agent systems, proposes evaluation framework, tests GPT-4 for steganographic message passing (up to 26% success rate).
+- **Datasets Used**: Custom evaluation framework with Schelling point tasks.
+- **Key Results**: Current models have limited steganographic capabilities but GPT-4 showed a capability jump. Prompted GPT-4 achieves up to 26% success rate.
+- **Code Available**: Yes (evaluation framework)
+- **Relevance**: Provides the multi-agent collusion context for steganography risks.
+
+### Paper 6: Hidden in Plain Text: Emergence &amp; Mitigation of Steganographic Collusion in LLMs
+- **Authors**: Mathew, Matthews, McCarthy, Velja, de Witt, Cope, Schoots
+- **Year**: 2024
+- **Source**: arXiv:2410.03768
+- **Key Contribution**: Shows steganographic collusion can emerge from misspecified reward incentives during training (not just prompting). Tests GBRL and ICRL methods. Standard mitigations (paraphrasing) not fully effective.
+- **Datasets Used**: Custom collusion scenarios.
+- **Key Results**:
+  - o1 model tends toward dog-whistling rather than true steganography
+  - Prompted steganographic messages with ~4.6 bits of entropy
+  - Standard mitigations (passive oversight, paraphrasing) are insufficient
+- **Code Available**: Yes
+- **Relevance**: Demonstrates that steganographic behavior can emerge from training, not just prompting, and that current defenses have gaps.
+
+### Paper 7: Neural Linguistic Steganography
+- **Authors**: Ziegler, Deng, Rush
+- **Year**: 2019
+- **Source**: arXiv:1909.01496
+- **Key Contribution**: Proposes arithmetic coding with neural language models for steganography. Foundational work on generation-based text steganography.
+- **Relevance**: Establishes the technical foundation for LLM-based steganography methods.
+
+---
+
+## Common Methodologies
+
+- **Acrostic encoding**: First letter of sentences/lines encodes secret message. Used in NEST, Early Signs, and Steganographic Potentials. Most commonly spontaneously adopted by LLMs.
+- **Word-position encoding**: First letter of every Nth word. Used in Early Signs (`third_word_letter`). More diluted than acrostics.
+- **RL fine-tuning**: RLOO, PPO for training encoder/decoder pairs (Steganographic Potentials, Hidden in Plain Text).
+- **Prompted evaluation**: Testing frontier models via prompts without fine-tuning (NEST, Early Signs, Steganographic Potentials).
+- **Monitor-based evaluation**: Using LLM monitors (GPT-4.1-mini, GPT-4o-mini) to detect steganographic content, with false positive rate thresholds.
+- **Paraphrasing defense**: Rewriting model outputs to destroy steganographic signals (Roger &amp; Greenblatt).
+
+## Standard Baselines
+
+- **No reasoning baseline**: Model answers without CoT
+- **Plain CoT**: Standard chain-of-thought reasoning (ceiling)
+- **Filler tokens**: N tokens of padding before answer
+- **Direct answer**: No reasoning, just answer
+- **Random baseline**: Expected accuracy by chance (~6% per digit for NEST&#39;s letter set)
+
+## Evaluation Metrics
+
+- **Per-number/per-digit accuracy**: Partial credit for correct encoding (NEST)
+- **Exact match rate**: All digits correct (NEST)
+- **Match ratio**: 1 - CER(extracted, target) (NEST)
+- **Monitor evasion rate**: Fraction not flagged by monitor (Early Signs, NEST)
+- **Success rate**: Decoder reconstructs message AND evades monitor (Early Signs)
+- **Undetected accuracy**: Correct encode/decode without detection (Steganographic Potentials)
+- **Encoding quality / CER**: Character error rate between target and extracted strings
+
+## Datasets in the Literature
+
+| Dataset | Used In | Task |
+|---------|---------|------|
+| GSM8K | NEST | Grade-school math (hidden task) |
+| Anthropic HH-RLHF | NEST, Early Signs | Cover questions |
+| AQuA-RAT | Early Signs | Algebraic word problems (hidden task) |
+| GPQA-Diamond | Early Signs | PhD-level science questions |
+| Custom state-tracking | Early Signs | 1D/2D agent position tracking |
+| Custom counting tasks | NEST | Numerical sequence encoding |
+| Wikinews | Steganographic Potentials | News articles for summarization |
+| MMLU | Steganographic Potentials | General knowledge evaluation |
+
+## Gaps and Opportunities
+
+### The Diluted Steganography Gap
+**No existing work systematically studies the effect of signal dilution on steganographic performance.** While NEST studies acrostics at varying sequence lengths (D) and Early Signs compares `sentence_letter` vs `third_word_letter`, neither paper:
+1. Systematically varies the degree of dilution (e.g., every sentence, every 2nd sentence, every 3rd sentence, word after trigger)
+2. Measures how dilution affects both encoding accuracy AND detection evasion simultaneously
+3. Tests trigger-word-based encoding patterns (e.g., &#34;the word after each use of &#39;the&#39;&#34;)
+4. Characterizes the accuracy-detectability tradeoff as a function of dilution level
+
+### Specific Research Opportunities
+1. **Dilution gradient study**: Systematically vary signal density from every token to every Nth token
+2. **Trigger-word patterns**: Test encoding via words following specific trigger words at varying frequencies
+3. **Dilution vs. detectability tradeoff**: More diluted signals may be harder to detect but also harder to implement
+4. **Cross-model comparison at fixed dilution levels**: How does dilution sensitivity vary across model families?
+5. **Cognitive load of diluted encoding**: Does embedding in every 5th sentence vs every sentence require different capabilities?
+
+---
+
+## Recommendations for Our Experiment
+
+### Recommended Datasets
+1. **Anthropic HH-RLHF** (cover questions) - standard in the field
+2. **GSM8K** (for reasoning tasks) - used in NEST
+3. **Custom counting/sequence tasks** - following NEST&#39;s methodology but with diluted patterns
+4. **AQuA-RAT** - for testing encoded reasoning at different dilution levels
+
+### Recommended Baselines
+1. **Acrostic (sentence_letter)** - the &#34;concentrated&#34; baseline from NEST/Early Signs
+2. **third_word_letter** - the &#34;slightly diluted&#34; baseline from Early Signs  
+3. **No encoding** - plain answer baseline
+4. **Random baseline** - chance-level performance
+
+### Recommended Metrics
+1. **Per-element accuracy** (partial credit) at varying dilution levels
+2. **Exact match rate** at varying dilution levels
+3. **Monitor evasion rate** at varying dilution levels
+4. **Combined success rate** (correct + undetected)
+5. **Dilution-accuracy curve**: Plot accuracy as function of dilution factor
+
+### Methodological Considerations
+- Use NEST&#39;s randomized digit-to-letter mapping to prevent models from using memorized patterns
+- Disable internal reasoning (where possible) to test visible CoT steganography
+- Use multiple monitor models at different capability levels
+- Test at least 100 samples per condition for statistical power
+- Include both frontier models (Claude Opus, GPT-4.1+) and smaller models to track capability scaling
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. AUTHOR
+   - Use this exact author line in the \author{} block: Ari Holtzman and NeuriCo
+
+3. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+4. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+5. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+6. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+7. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+8. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+9. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+10. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   \author{Ari Holtzman and NeuriCo}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Command templates are pre-copied to paper_draft/commands/:
+   - math.tex: Math notation macros
+   - general.tex: Formatting macros
+   - macros.tex: Project-specific term definitions (customize this for your paper)
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read .claude/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.

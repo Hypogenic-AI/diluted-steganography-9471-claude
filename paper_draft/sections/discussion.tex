@@ -1,0 +1,50 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{The Cliff Effect: Pattern Memorization, Not Compositional Skill}
+
+The most striking finding is the abrupt collapse from near-perfect acrostic performance to near-random performance on any diluted scheme. We propose three complementary explanations.
+
+First, \textbf{acrostics are a memorized pattern}. LLM training data contains extensive examples of acrostic poems, word puzzles, and writing exercises that use first-letter-of-sentence encoding. Models have learned ``first letter of each sentence'' as a specific, well-practiced skill. This is analogous to how models can perform arithmetic on numbers within their training distribution but fail on out-of-distribution formats~\citep{vaswani2017attention}.
+
+Second, \textbf{counting is hard for autoregressive models}. Schemes like \nthword{5} or \nthword{10} require maintaining a running word counter during generation. Each token prediction must account for the current position in the counting sequence, a form of state tracking that transformers are known to struggle with when the state is not explicitly represented in the context.
+
+Third, \textbf{sentences are natural boundaries}. Acrostics align signal with sentence breaks, which are already salient structural units for language models. Word-position schemes cut across sentence boundaries, requiring a fundamentally different type of attention to positional structure within running text.
+
+The trigger-word scheme provides additional evidence for this interpretation. Although it avoids fixed positional counting, it requires tracking occurrences of a specific word (``the'') and coordinating the next word's first letter---a task that combines lexical monitoring with constrained generation. Models find this comparably difficult to positional schemes.
+
+\subsection{Extraction vs.\ Encoding Asymmetry}
+
+\gptmodel shows a consistent asymmetry: extraction accuracy exceeds encoding accuracy on diluted schemes (e.g., 55\% vs.\ 31\% on \nthword{5}). This makes intuitive sense. Encoding requires the model to \emph{simultaneously} produce fluent text and satisfy positional constraints---a constrained generation problem. Extraction only requires reading existing text and identifying characters at specified positions---a comprehension problem. The asymmetry suggests that the bottleneck for diluted steganography is not understanding the rule but implementing it during generation.
+
+\claudemodel and \geminimodel show a less clear asymmetry, partly because their extraction performance is also poor. \claudemodel in particular often produced meta-commentary about its extraction strategy rather than actually extracting, suggesting a failure mode specific to instruction following under positional counting demands.
+
+\subsection{The Detection Failure}
+
+The complete failure of blind detection deserves separate discussion. The result is not that models are \emph{bad} at detection---it is that they do not perform detection at all. Each model applies a fixed bias (always YES or always NO) regardless of input.
+
+This is especially revealing in \claudemodel's case: when analyzing acrostic texts, it correctly extracts the hidden message while still reporting ``no hidden message detected.'' The model can perform the analysis required for detection but cannot convert that analysis into a calibrated classification judgment. This suggests that the detection failure is not about analytical capability but about the model's uncertainty calibration and response formatting when asked a binary question about an unfamiliar task.
+
+For AI safety, this means that LLM-based steganography monitors---approaches that ask a language model ``does this text contain a hidden message?''---are fundamentally unreliable in their current form. Even if the monitor model can extract a hidden message when told where to look, it cannot make the prior judgment of whether to look.
+
+\subsection{Implications for AI Safety}
+
+Our results yield a mixed message for AI safety monitoring.
+
+\para{The good news.} Current frontier models cannot produce diluted steganography. Even if a model were instructed to encode a message using every 10th word, it would fail. This limits the immediate risk of models spontaneously developing covert communication channels that evade simple pattern-matching detectors focused on acrostics.
+
+\para{The bad news.} LLM-based monitors cannot detect steganography at any dilution level. If models eventually learn diluted encoding (through fine-tuning, tool augmentation, or architectural advances), current detection approaches would be blind to it. The defense and the attack are both broken, but the defense may be harder to fix because it requires solving a harder problem (detection without knowing the scheme) than the attack (encoding with a known scheme).
+
+\para{Recommendation.} AI safety systems should not rely solely on LLM-based steganography detection. Statistical and algorithmic methods---entropy analysis, frequency analysis, information-theoretic bounds---may provide more robust detection than asking a language model ``does this look suspicious?'' Defense-in-depth approaches that combine multiple detection modalities are likely necessary.
+
+\subsection{Limitations}
+
+\para{Sample size.} We use 5 messages per condition, yielding 90 trials per experiment. Larger studies with 50--100+ messages per condition would provide tighter confidence intervals and more reliable effect size estimates. Our statistical tests are powered to detect the large acrostic--diluted gap but may miss smaller differences between diluted schemes.
+
+\para{Prompt sensitivity.} We use a single, direct prompt design for each experiment. Chain-of-thought prompting, few-shot examples, or explicit counting scaffolds might improve performance on diluted schemes. Our results characterize default prompted behavior, not the ceiling of what models can achieve with optimized prompting.
+
+\para{Programmatic ground-truth texts.} Our generated texts for Experiments 2 and 3 use formulaic structure and limited vocabulary, which may differ from natural steganographic text. Models might perform differently on more naturalistic cover texts.
+
+\para{Binary detection framing.} Asking models for a YES/NO detection judgment may elicit response biases. A forced-choice design (``which of two texts contains a hidden message?'') might yield more informative results by controlling for base-rate biases.
+
+\para{No fine-tuned models.} All tests use off-the-shelf prompted models. Fine-tuned models~\citep{roger2023preventing, karpov2025potentials} might exhibit different capability profiles, particularly for diluted schemes where the counting behavior could potentially be trained.

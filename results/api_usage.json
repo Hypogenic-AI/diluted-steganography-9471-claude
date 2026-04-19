@@ -1,0 +1,10 @@
+{
+  "total_calls": 180,
+  "total_input_tokens": 30314,
+  "total_output_tokens": 43859,
+  "calls_by_model": {
+    "claude-sonnet-4-5": 60,
+    "gemini-2.5-pro": 60,
+    "gpt-4.1": 60
+  }
+}

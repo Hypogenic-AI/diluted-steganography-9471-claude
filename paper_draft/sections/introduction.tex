@@ -1,0 +1,22 @@
+\section{Introduction}
+\label{sec:intro}
+
+Can large language models hide messages in plain text? Recent work suggests the answer is a qualified yes: frontier models produce convincing acrostic encodings where the first letter of each sentence spells a secret message, sometimes achieving over 90\% per-character accuracy~\citep{karpov2026nest, zolkowski2025early}. This capability raises immediate concerns for AI safety. If models can encode information steganographically, they could potentially embed hidden reasoning in chain-of-thought outputs~\citep{roger2023preventing}, coordinate covertly in multi-agent systems~\citep{motwani2024secret}, or smuggle information past monitoring systems~\citep{mathew2024hidden}.
+
+But acrostics are a special case. They align signal with sentence boundaries---a natural linguistic unit that appears frequently in training data through poems, puzzles, and wordplay exercises. The practical question for AI safety is not whether models can produce acrostics, but whether they possess a \emph{general} steganographic capability that extends to more diluted encoding schemes. If a model can hide a message in the first letters of every 10th or 20th word, evading detection becomes far easier because the signal is spread thinly across a larger text.
+
+Prior work has begun to address this question but leaves significant gaps. \citet{karpov2026nest} systematically varied sequence length within acrostic encoding, showing that accuracy degrades as messages grow longer. \citet{zolkowski2025early} compared acrostic (\texttt{sentence\_letter}) and every-third-word (\texttt{third\_word\_letter}) schemes, finding that models perform worse on the latter. However, no study has systematically varied the dilution level as a continuous parameter across a wide range, measured encoding and extraction and detection in a unified framework, or tested trigger-word-based schemes where signal placement depends on lexical context rather than fixed positions.
+
+We address this gap with a systematic study of signal dilution in LLM steganography. We test three frontier models---\gptmodel, \claudemodel, and \geminimodel---across six encoding schemes spanning a dilution gradient from concentrated acrostics ($\sim$1 character per sentence) to highly diluted every-20th-word patterns ($\sim$1 character per 20 words), including a novel trigger-word scheme. We evaluate three capabilities: (1) encoding---can the model produce text with the hidden message? (2) informed extraction---can the model recover the message when told the scheme? (3) blind detection---can the model detect that a message is present without knowing the scheme?
+
+Our main finding is a \emph{cliff effect}: all three models drop from 92--100\% accuracy on acrostics to below 43\% on every other scheme, with no gradual degradation between dilution levels. This is not a smooth capability curve but an abrupt transition from a well-learned pattern to near-random performance. For blind detection, the picture is even starker: no model can discriminate between steganographic and control texts at any dilution level.
+
+Our contributions are:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We conduct the first systematic study of signal dilution in LLM steganography, testing six encoding schemes across three frontier models in a unified evaluation framework covering encoding, extraction, and detection (270 total trials).
+    \item We identify a cliff effect in steganographic capability: performance collapses abruptly beyond acrostics rather than degrading gradually, suggesting acrostic ability is a memorized pattern rather than a general compositional skill.
+    \item We introduce and evaluate trigger-word-based steganographic encoding, a novel scheme where signal placement depends on lexical context rather than fixed word positions.
+    \item We demonstrate that LLM-based blind detection is non-functional at all dilution levels, with models applying fixed biases (always ``yes'' or always ``no'') regardless of whether hidden messages are present.
+\end{itemize}
+
+The remainder of this paper is organized as follows. \Secref{sec:related} surveys related work on LLM steganography and AI safety. \Secref{sec:method} describes our experimental methodology. \Secref{sec:results} presents results across all three experiments. \Secref{sec:discussion} discusses implications for AI safety and the nature of LLM steganographic capabilities, and \secref{sec:conclusion} concludes.

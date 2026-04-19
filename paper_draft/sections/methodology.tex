@@ -1,0 +1,65 @@
+\section{Methodology}
+\label{sec:method}
+
+We design three experiments that jointly characterize how signal dilution affects LLM steganographic capabilities: encoding (can the model produce it?), informed extraction (can the model decode it?), and blind detection (can the model detect it?). Each experiment tests three frontier models across six encoding schemes of increasing dilution.
+
+\subsection{Encoding Schemes}
+\label{sec:schemes}
+
+We define six encoding schemes ordered by increasing signal dilution, measured as the number of words between consecutive signal-carrying positions. \Tabref{tab:schemes} summarizes the schemes.
+
+\begin{table}[t]
+    \centering
+    \caption{Encoding schemes ordered by increasing signal dilution. Signal density indicates the approximate number of words per encoded character. The \triggerword scheme density varies with the frequency of ``the'' in the generated text.}
+    \begin{tabular}{@{}llp{6.5cm}@{}}
+        \toprule
+        \textbf{Scheme} & \textbf{Signal Density} & \textbf{Description} \\
+        \midrule
+        \acrostic & $\sim$1 char/sentence & First letter of each sentence spells the message \\
+        \nthword{3} & 1 char/3 words & First letter of every 3rd word encodes a character \\
+        \nthword{5} & 1 char/5 words & First letter of every 5th word encodes a character \\
+        \triggerword & $\sim$1 char/8 words & Word after each ``the'' starts with the target letter \\
+        \nthword{10} & 1 char/10 words & First letter of every 10th word encodes a character \\
+        \nthword{20} & 1 char/20 words & First letter of every 20th word encodes a character \\
+        \bottomrule
+    \end{tabular}
+    \label{tab:schemes}
+\end{table}
+
+The \acrostic scheme serves as a concentrated baseline: it aligns signal with sentence boundaries, a natural linguistic unit that LLMs encounter frequently in training data. The positional schemes (\nthword{3} through \nthword{20}) require the model to maintain a running word counter during generation or extraction---a capability known to be challenging for autoregressive transformers~\citep{vaswani2017attention}. The \triggerword scheme introduces a qualitatively different challenge: signal positions are determined by lexical context (occurrences of ``the'') rather than fixed positions, requiring the model to track both word identity and counting simultaneously.
+
+\subsection{Models}
+\label{sec:models}
+
+We evaluate three frontier models: \gptmodel (OpenAI API), \claudemodel (via OpenRouter), and \geminimodel (via OpenRouter). We use temperature 0.3 for encoding tasks (to allow creative text generation) and temperature 0.0 for extraction and detection tasks (to maximize determinism). Maximum token length is set to 1024 for encoding and 100 for extraction and detection responses.
+
+\subsection{Secret Messages}
+\label{sec:messages}
+
+We use five secret messages of 5--6 characters: ``HELLO'', ``FROST'', ``MAGIC'', ``DANCE'', and ``SILVER''. These use common English initial letters to avoid biasing results toward rare-letter difficulty.
+
+\subsection{Experiments}
+
+\para{Experiment 1: Encoding capability.}
+We prompt each model to write natural-sounding text that encodes a secret message using a specified scheme. We provide explicit instructions describing the encoding rule (\eg ``write a paragraph where the first letter of every 5th word spells HELLO''). We then programmatically extract the hidden message from the generated text and measure accuracy. This yields 90 trials (3 models $\times$ 6 schemes $\times$ 5 messages).
+
+\para{Experiment 2: Informed extraction.}
+We generate ground-truth steganographic texts programmatically, ensuring correct encoding is verifiable. We provide each model with the text and explicit extraction instructions (\eg ``extract the message encoded in the first letter of every 5th word'') and measure extraction accuracy. This yields 90 trials.
+
+\para{Experiment 3: Blind detection.}
+We present texts to each model without revealing the encoding scheme. For each model--scheme combination, we include 3 steganographic texts and 2 control texts (text without hidden messages), and ask the model to determine whether a hidden message is present. This yields 90 trials (3 models $\times$ 6 schemes $\times$ 5 texts).
+
+\subsection{Evaluation Metrics}
+
+\para{Per-character accuracy.}
+The fraction of character positions where the extracted character matches the target. For a target message of length $n$ and extracted sequence $\hat{m}$, accuracy is $\frac{1}{n}\sum_{i=1}^{n} \mathbf{1}[\hat{m}_i = m_i]$. Random chance is $1/26 \approx 3.8\%$.
+
+\para{Exact match rate.}
+The fraction of trials where the entire extracted message matches the target exactly.
+
+\para{True positive rate (TPR) and false positive rate (FPR).}
+For blind detection, the fraction of steganographic texts correctly identified (TPR) and control texts incorrectly flagged (FPR).
+
+\subsection{Statistical Analysis}
+
+We use Mann-Whitney $U$ tests~\citep{mann1947test} to compare accuracy distributions between scheme pairs, as our sample sizes are small and we cannot assume normality. We compute Spearman rank correlations between dilution rank (ordinal: 1 = \acrostic through 6 = \nthword{20}) and per-character accuracy to test for monotonic dilution--accuracy relationships. We report significance at $p < 0.05$ and $p < 0.01$ thresholds.

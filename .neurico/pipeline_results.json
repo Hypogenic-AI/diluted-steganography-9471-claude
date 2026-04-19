@@ -1,0 +1,27 @@
+{
+  "success": true,
+  "stages": {
+    "resource_finder": {
+      "success": true,
+      "completion_marker": "/workspaces/diluted-steganography-9471-claude/.resource_finder_complete",
+      "outputs": {
+        "literature_review": "/workspaces/diluted-steganography-9471-claude/literature_review.md",
+        "resources_catalog": "/workspaces/diluted-steganography-9471-claude/resources.md",
+        "papers_dir": "/workspaces/diluted-steganography-9471-claude/papers",
+        "datasets_dir": "/workspaces/diluted-steganography-9471-claude/datasets",
+        "code_dir": "/workspaces/diluted-steganography-9471-claude/code"
+      },
+      "log_file": "/workspaces/diluted-steganography-9471-claude/logs/resource_finder_claude.log",
+      "transcript_file": "/workspaces/diluted-steganography-9471-claude/logs/resource_finder_claude_transcript.jsonl",
+      "elapsed_time": 1065.7806763648987
+    },
+    "experiment_runner": {
+      "success": true,
+      "return_code": 0,
+      "elapsed_time": 2179.528233766556,
+      "log_file": "/workspaces/diluted-steganography-9471-claude/logs/execution_claude.log",
+      "transcript_file": "/workspaces/diluted-steganography-9471-claude/logs/execution_claude_transcript.jsonl"
+    }
+  },
+  "work_dir": "/workspaces/diluted-steganography-9471-claude"
+}
